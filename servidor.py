@@ -1,3 +1,63 @@
+# ============================================================
+# ARRANQUE CON PYTHON PORTABLE
+# ============================================================
+
+import os
+import sys
+import subprocess
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PYTHON_PORTABLE = os.path.join(BASE_DIR, "python", "python.exe")
+PAQUETES_DIR = os.path.join(BASE_DIR, "paquetes")
+FFMPEG_DIR = os.path.join(BASE_DIR, "ffmpeg")
+
+# Si existe nuestro Python Portable y actualmente no lo estamos usando,
+# reiniciamos servidor.py utilizando ese Python.
+if (
+    os.path.isfile(PYTHON_PORTABLE)
+    and os.path.abspath(sys.executable).lower()
+    != os.path.abspath(PYTHON_PORTABLE).lower()
+):
+    os.environ["PYTHONPATH"] = (
+        PAQUETES_DIR
+        + os.pathsep
+        + os.environ.get("PYTHONPATH", "")
+    )
+
+    os.environ["PATH"] = (
+        FFMPEG_DIR
+        + os.pathsep
+        + os.path.dirname(PYTHON_PORTABLE)
+        + os.pathsep
+        + os.environ.get("PATH", "")
+    )
+
+    subprocess.call(
+        [
+            PYTHON_PORTABLE,
+            os.path.abspath(__file__)
+        ],
+        cwd=BASE_DIR,
+        env=os.environ.copy()
+    )
+
+    sys.exit(0)
+
+# Configuración para cuando ya estamos dentro del Python Portable
+
+if PAQUETES_DIR not in sys.path:
+    sys.path.insert(0, PAQUETES_DIR)
+
+os.environ["PATH"] = (
+    FFMPEG_DIR
+    + os.pathsep
+    + os.environ.get("PATH", "")
+)
+
+# ============================================================
+# A PARTIR DE AQUÍ VAN LOS IMPORTS NORMALES DEL SERVIDOR
+# ============================================================
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
