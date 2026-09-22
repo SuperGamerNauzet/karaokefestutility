@@ -1,20 +1,17 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-title Desinstalador - KaraokeFest Utility
+title KaraokeFest Utility - Desinstalador
 
 echo.
 echo ============================================================
-echo          KARAOKEFEST UTILITY - DESINSTALADOR
+echo              KARAOKEFEST UTILITY
+echo                  DESINSTALADOR
 echo ============================================================
 echo.
-echo Selecciona la carpeta PADRE donde instalaste
+echo Este desinstalador NO necesita permisos de administrador.
+echo.
+echo Selecciona la carpeta PADRE donde esta instalada
 echo KaraokeFest Utility.
-echo.
-echo Por ejemplo:
-echo.
-echo     Escritorio
-echo     Documentos
-echo     D:\
 echo.
 pause
 
@@ -33,48 +30,167 @@ if errorlevel 1 (
 )
 
 :: ============================================================
-:: ARCHIVO TEMPORAL
+:: ARCHIVOS TEMPORALES
 :: ============================================================
 
 set "SELECCION=%TEMP%\karaokefest_desinstalar_%RANDOM%.txt"
+set "ABIERTO=%TEMP%\karaokefest_desinstalar_abierto_%RANDOM%.txt"
+set "PSCRIPT=%TEMP%\karaokefest_desinstalar_selector_%RANDOM%.ps1"
 
 if exist "%SELECCION%" del /f /q "%SELECCION%" >nul 2>&1
+if exist "%ABIERTO%" del /f /q "%ABIERTO%" >nul 2>&1
+if exist "%PSCRIPT%" del /f /q "%PSCRIPT%" >nul 2>&1
 
 :: ============================================================
-:: SELECTOR
+:: CREAR SELECTOR
+:: ============================================================
+
+(
+echo Add-Type -AssemblyName System.Windows.Forms
+echo $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+echo $dialog.Description = 'Selecciona la carpeta donde esta karaokefestutility'
+echo $dialog.ShowNewFolderButton = $false
+echo [System.IO.File]::WriteAllText^('%ABIERTO%', 'OK'^)
+echo if ^($dialog.ShowDialog^(^) -eq [System.Windows.Forms.DialogResult]::OK^) {
+echo     [System.IO.File]::WriteAllText^('%SELECCION%', $dialog.SelectedPath^)
+echo }
+) > "%PSCRIPT%"
+
+:: ============================================================
+:: ABRIR SELECTOR
 :: ============================================================
 
 echo.
-echo Abriendo selector...
+echo Abriendo selector de carpeta...
 echo.
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"Add-Type -AssemblyName System.Windows.Forms; ^
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog; ^
-$dialog.Description = 'Selecciona la carpeta que contiene karaokefestutility'; ^
-$dialog.ShowNewFolderButton = $false; ^
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { ^
-    [System.IO.File]::WriteAllText('%SELECCION%', $dialog.SelectedPath) ^
-}"
+start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PSCRIPT%"
 
-if not exist "%SELECCION%" (
+set /a TIEMPO=0
+
+:ESPERAR_SELECTOR
+
+if exist "%ABIERTO%" goto SELECTOR_ABIERTO
+
+if %TIEMPO% GEQ 10 goto SELECTOR_TARDA
+
+timeout /t 1 /nobreak >nul
+set /a TIEMPO+=1
+
+goto ESPERAR_SELECTOR
+
+:: ============================================================
+:: SELECTOR ABIERTO
+:: ============================================================
+
+:SELECTOR_ABIERTO
+
+echo.
+echo Selector abierto correctamente.
+echo.
+echo Elige la carpeta que contiene:
+echo.
+echo     karaokefestutility
+echo.
+echo Puedes tardar todo el tiempo que necesites.
+echo.
+
+:ESPERAR_SELECCION
+
+if exist "%SELECCION%" goto CARPETA_SELECCIONADA
+
+timeout /t 1 /nobreak >nul
+goto ESPERAR_SELECCION
+
+:: ============================================================
+:: CARPETA SELECCIONADA
+:: ============================================================
+
+:CARPETA_SELECCIONADA
+
+set "BASE="
+
+for /f "usebackq delims=" %%A in ("%SELECCION%") do (
+    set "BASE=%%A"
+)
+
+del /f /q "%SELECCION%" >nul 2>&1
+del /f /q "%ABIERTO%" >nul 2>&1
+del /f /q "%PSCRIPT%" >nul 2>&1
+
+if not defined BASE goto RUTA_MANUAL
+
+goto CARPETA_LISTA
+
+:: ============================================================
+:: SELECTOR TARDA MAS DE 10 SEGUNDOS
+:: ============================================================
+
+:SELECTOR_TARDA
+
+echo.
+echo ============================================================
+echo El selector ha tardado mas de 10 segundos en abrirse.
+echo ============================================================
+echo.
+echo Se utilizara la entrada manual.
+echo.
+
+taskkill /F /IM powershell.exe >nul 2>&1
+
+goto RUTA_MANUAL
+
+:: ============================================================
+:: RUTA MANUAL
+:: ============================================================
+
+:RUTA_MANUAL
+
+del /f /q "%SELECCION%" >nul 2>&1
+del /f /q "%ABIERTO%" >nul 2>&1
+del /f /q "%PSCRIPT%" >nul 2>&1
+
+echo.
+echo ============================================================
+echo INTRODUCE LA RUTA MANUALMENTE
+echo ============================================================
+echo.
+echo Ejemplo:
+echo.
+echo C:\Users\Pc\Desktop
+echo.
+
+set "BASE="
+set /p "BASE=Ruta: "
+
+if not defined BASE (
     echo.
-    echo No se selecciono ninguna carpeta.
+    echo No se introdujo ninguna ruta.
     echo Desinstalacion cancelada.
     echo.
     pause
-    exit /b 0
+    exit /b 1
 )
 
-set /p "BASE=<%SELECCION%"
+set "BASE=%BASE:"=%"
 
-del /f /q "%SELECCION%" >nul 2>&1
+goto CARPETA_LISTA
+
+:: ============================================================
+:: COMPROBAR INSTALACION
+:: ============================================================
+
+:CARPETA_LISTA
 
 set "DESTINO=%BASE%\karaokefestutility"
 
-:: ============================================================
-:: COMPROBAR
-:: ============================================================
+echo.
+echo ============================================================
+echo Instalacion encontrada:
+echo.
+echo %DESTINO%
+echo ============================================================
+echo.
 
 if not exist "%DESTINO%" (
     echo.
@@ -92,11 +208,8 @@ if not exist "%DESTINO%" (
 if not exist "%DESTINO%\servidor.py" (
     echo.
     echo ERROR:
-    echo La carpeta existe, pero no parece ser una
-    echo instalacion de KaraokeFest Utility.
-    echo.
-    echo Carpeta:
-    echo %DESTINO%
+    echo La carpeta existe, pero no parece ser una instalacion
+    echo de KaraokeFest Utility.
     echo.
     pause
     exit /b 1
@@ -108,28 +221,30 @@ if not exist "%DESTINO%\servidor.py" (
 
 echo.
 echo ============================================================
-echo SE VA A ELIMINAR:
+echo ATENCION
+echo ============================================================
+echo.
+echo Se eliminara COMPLETAMENTE:
 echo.
 echo %DESTINO%
 echo.
-echo Se eliminaran:
+echo Incluyendo:
 echo.
-echo   - Python portable
-echo   - FFmpeg
-echo   - Paquetes Python
-echo   - servidor.py
-echo   - musica
-echo   - videos
-echo   - playlist.db si existe
-echo   - cualquier otro archivo dentro de esa carpeta
+echo   Python portable
+echo   FFmpeg
+echo   Paquetes Python
+echo   Musica descargada
+echo   Videos descargados
+echo   Base de datos
+echo   servidor.py
+echo   Archivos de configuracion
 echo.
-echo NO se eliminara el Python del sistema.
-echo NO se modificara el registro.
-echo NO se modificara PATH.
+echo El Python normal de Windows NO sera eliminado.
+echo.
 echo ============================================================
 echo.
 
-choice /C SN /N /M "Continuar con la desinstalacion? [S/N]: "
+choice /C SN /N /M "Eliminar esta instalacion? [S/N]: "
 
 if errorlevel 2 (
     echo.
@@ -144,17 +259,21 @@ if errorlevel 2 (
 :: ============================================================
 
 echo.
-echo Eliminando...
+echo Eliminando instalacion...
+echo.
 
 rmdir /s /q "%DESTINO%"
 
 if exist "%DESTINO%" (
     echo.
-    echo ERROR:
+    echo ============================================================
+    echo ERROR
+    echo ============================================================
+    echo.
     echo Windows no pudo eliminar completamente la carpeta.
     echo.
-    echo Puede que el servidor siga ejecutandose.
-    echo Cierra primero KaraokeFest Utility y vuelve a intentarlo.
+    echo Comprueba que KaraokeFest Utility no este ejecutandose.
+    echo Cierra el servidor y vuelve a ejecutar desinstalar.bat.
     echo.
     pause
     exit /b 1
@@ -162,12 +281,13 @@ if exist "%DESTINO%" (
 
 echo.
 echo ============================================================
-echo       DESINSTALACION COMPLETADA
+echo          DESINSTALACION COMPLETADA
 echo ============================================================
 echo.
-echo KaraokeFest Utility ha sido eliminado.
+echo KaraokeFest Utility ha sido eliminado correctamente.
 echo.
-echo El Python normal de Windows NO ha sido tocado.
+echo El Python del sistema NO ha sido tocado.
 echo.
 pause
+
 exit /b 0
