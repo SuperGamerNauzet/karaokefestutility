@@ -1,3 +1,5 @@
+@echo off
+
 :: ============================================================
 :: SELECTOR DE CARPETA
 :: SI TARDA MAS DE 10 SEGUNDOS EN ABRIRSE -> RUTA MANUAL
