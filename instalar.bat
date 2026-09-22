@@ -1,611 +1,378 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+
 title KaraokeFest Utility - Instalador
 
-echo.
-echo ============================================================
-echo              KARAOKEFEST UTILITY
-echo                    INSTALADOR
-echo ============================================================
-echo.
-echo Este instalador NO necesita permisos de administrador.
-echo.
-echo Puedes elegir cualquier carpeta donde tengas permisos
-echo de escritura, por ejemplo el Escritorio.
-echo.
-pause
+REM ============================================================
+REM CARPETA DEL PROYECTO
+REM ============================================================
 
-:: ============================================================
-:: COMPROBAR POWERSHELL
-:: ============================================================
-
-where powershell.exe >nul 2>&1
-
-if errorlevel 1 (
-    echo.
-    echo ERROR: No se encontro PowerShell.
-    echo.
-    pause
-    exit /b 1
-)
-
-:: ============================================================
-:: ARCHIVOS TEMPORALES
-:: ============================================================
-
-set "SELECCION=%TEMP%\karaokefest_seleccion_%RANDOM%.txt"
-set "ABIERTO=%TEMP%\karaokefest_abierto_%RANDOM%.txt"
-set "PSCRIPT=%TEMP%\karaokefest_selector_%RANDOM%.ps1"
-
-if exist "%SELECCION%" del /f /q "%SELECCION%" >nul 2>&1
-if exist "%ABIERTO%" del /f /q "%ABIERTO%" >nul 2>&1
-if exist "%PSCRIPT%" del /f /q "%PSCRIPT%" >nul 2>&1
-
-:: ============================================================
-:: CREAR SCRIPT POWERSHELL DEL SELECTOR
-:: ============================================================
-
-(
-echo Add-Type -AssemblyName System.Windows.Forms
-echo $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-echo $dialog.Description = 'Selecciona la carpeta donde instalar KaraokeFest Utility'
-echo $dialog.ShowNewFolderButton = $true
-echo [System.IO.File]::WriteAllText^('%ABIERTO%', 'OK'^)
-echo if ^($dialog.ShowDialog^(^) -eq [System.Windows.Forms.DialogResult]::OK^) {
-echo     [System.IO.File]::WriteAllText^('%SELECCION%', $dialog.SelectedPath^)
-echo }
-) > "%PSCRIPT%"
-
-:: ============================================================
-:: ABRIR SELECTOR
-:: ============================================================
-
-echo.
-echo Abriendo selector de carpeta...
-echo.
-
-start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PSCRIPT%"
-
-:: ============================================================
-:: ESPERAR A QUE EL SELECTOR SE ABRA
-:: MAXIMO 10 SEGUNDOS
-:: ============================================================
-
-set /a TIEMPO=0
-
-:ESPERAR_SELECTOR
-
-if exist "%ABIERTO%" goto SELECTOR_ABIERTO
-
-if %TIEMPO% GEQ 10 goto SELECTOR_TARDA
-
-timeout /t 1 /nobreak >nul
-set /a TIEMPO+=1
-
-goto ESPERAR_SELECTOR
-
-:: ============================================================
-:: SELECTOR ABIERTO
-:: ============================================================
-
-:SELECTOR_ABIERTO
-
-echo.
-echo Selector abierto correctamente.
-echo.
-echo Elige la carpeta que quieras.
-echo Puedes tardar todo el tiempo que necesites.
-echo.
-
-:ESPERAR_SELECCION
-
-if exist "%SELECCION%" goto CARPETA_SELECCIONADA
-
-:: Comprobar si el usuario cerro/cancelo el selector.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"if (-not (Get-Process -Id $PID -ErrorAction SilentlyContinue)) { exit 1 }" >nul 2>&1
-
-timeout /t 1 /nobreak >nul
-goto ESPERAR_SELECCION
-
-:: ============================================================
-:: CARPETA SELECCIONADA
-:: ============================================================
-
-:CARPETA_SELECCIONADA
-
-set "BASE="
-
-for /f "usebackq delims=" %%A in ("%SELECCION%") do (
-    set "BASE=%%A"
-)
-
-del /f /q "%SELECCION%" >nul 2>&1
-del /f /q "%ABIERTO%" >nul 2>&1
-del /f /q "%PSCRIPT%" >nul 2>&1
-
-if not defined BASE (
-    echo.
-    echo No se obtuvo ninguna ruta.
-    goto RUTA_MANUAL
-)
-
-goto CARPETA_LISTA
-
-:: ============================================================
-:: SELECTOR TARDA MAS DE 10 SEGUNDOS EN ABRIR
-:: ============================================================
-
-:SELECTOR_TARDA
+set "BASE=%~dp0"
+if "%BASE:~-1%"=="\" set "BASE=%BASE:~0,-1%"
 
 echo.
 echo ============================================================
-echo El selector de carpetas ha tardado mas de 10 segundos
-echo en abrirse.
+echo       KARAOKEFEST UTILITY - INSTALADOR
 echo ============================================================
 echo.
-echo Se utilizara la entrada manual.
-echo.
-
-taskkill /F /IM powershell.exe >nul 2>&1
-
-goto RUTA_MANUAL
-
-:: ============================================================
-:: RUTA MANUAL
-:: ============================================================
-
-:RUTA_MANUAL
-
-del /f /q "%SELECCION%" >nul 2>&1
-del /f /q "%ABIERTO%" >nul 2>&1
-del /f /q "%PSCRIPT%" >nul 2>&1
-
-echo.
-echo ============================================================
-echo INTRODUCE LA RUTA MANUALMENTE
-echo ============================================================
-echo.
-echo Ejemplos:
-echo.
-echo C:\Users\Pc\Desktop
-echo C:\Users\Pc\Documents
-echo D:\Programas
-echo E:\Karaoke
-echo.
-
-set "BASE="
-set /p "BASE=Ruta: "
-
-if not defined BASE (
-    echo.
-    echo No se introdujo ninguna ruta.
-    echo Instalacion cancelada.
-    echo.
-    pause
-    exit /b 1
-)
-
-set "BASE=%BASE:"=%"
-
-goto CARPETA_LISTA
-
-:: ============================================================
-:: PREPARAR DESTINO
-:: ============================================================
-
-:CARPETA_LISTA
-
-echo.
-echo ============================================================
-echo CARPETA ELEGIDA:
-echo.
+echo Carpeta detectada:
 echo %BASE%
+echo.
+
+REM ============================================================
+REM COMPROBAR ARCHIVOS NECESARIOS
+REM ============================================================
+
+set "ERROR=0"
+
+if not exist "%BASE%\instalar.bat" (
+    echo [ERROR] Falta instalar.bat
+    set "ERROR=1"
+)
+
+if not exist "%BASE%\desinstalar.bat" (
+    echo [ERROR] Falta desinstalar.bat
+    set "ERROR=1"
+)
+
+if not exist "%BASE%\servidor.py" (
+    echo [ERROR] Falta servidor.py
+    set "ERROR=1"
+)
+
+if "%ERROR%"=="1" (
+    echo.
+    echo ============================================================
+    echo ERROR: Faltan archivos necesarios.
+    echo ============================================================
+    echo.
+    echo Debes tener estos tres archivos juntos:
+    echo.
+    echo   instalar.bat
+    echo   desinstalar.bat
+    echo   servidor.py
+    echo.
+    pause
+    exit /b 1
+)
+
+echo [OK] instalar.bat encontrado.
+echo [OK] desinstalar.bat encontrado.
+echo [OK] servidor.py encontrado.
+echo.
+
+REM ============================================================
+REM CARPETAS
+REM ============================================================
+
+set "PYTHON_DIR=%BASE%\python"
+set "PAQUETES_DIR=%BASE%\paquetes"
+set "FFMPEG_DIR=%BASE%\ffmpeg"
+
+if not exist "%PYTHON_DIR%" mkdir "%PYTHON_DIR%"
+if not exist "%PAQUETES_DIR%" mkdir "%PAQUETES_DIR%"
+if not exist "%FFMPEG_DIR%" mkdir "%FFMPEG_DIR%"
+
+REM ============================================================
+REM DESCARGAS TEMPORALES
+REM ============================================================
+
+set "TEMP_DIR=%TEMP%\KaraokeFestUtility"
+
+if exist "%TEMP_DIR%" rmdir /s /q "%TEMP_DIR%" >nul 2>&1
+mkdir "%TEMP_DIR%"
+
+REM ============================================================
+REM PYTHON PORTABLE
+REM ============================================================
+
+echo.
+echo ============================================================
+echo INSTALANDO PYTHON PORTABLE
 echo ============================================================
 echo.
 
-set "DESTINO=%BASE%\karaokefestutility"
+set "PYTHON_ZIP=%TEMP_DIR%\python.zip"
 
-echo La instalacion se realizara en:
-echo.
-echo %DESTINO%
-echo.
-
-:: ============================================================
-:: COMPROBAR SERVIDOR.PY
-:: ============================================================
-
-if not exist "%~dp0servidor.py" (
-    echo.
-    echo ERROR:
-    echo No se encontro servidor.py.
-    echo.
-    echo Debes tener estos archivos juntos:
-    echo.
-    echo     instalar.bat
-    echo     desinstalar.bat
-    echo     servidor.py
-    echo.
-    pause
-    exit /b 1
-)
-
-:: ============================================================
-:: COMPROBAR SI YA EXISTE
-:: ============================================================
-
-if exist "%DESTINO%" (
-    echo.
-    echo ATENCION:
-    echo La carpeta ya existe:
-    echo.
-    echo %DESTINO%
-    echo.
-    choice /C SN /N /M "Quieres continuar y reutilizarla? [S/N]: "
-
-    if errorlevel 2 (
-        echo.
-        echo Instalacion cancelada.
-        echo.
-        pause
-        exit /b 0
-    )
-)
-
-:: ============================================================
-:: CREAR CARPETAS
-:: ============================================================
-
-echo.
-echo [1/7] Creando carpetas...
-
-mkdir "%DESTINO%" >nul 2>&1
-mkdir "%DESTINO%\python" >nul 2>&1
-mkdir "%DESTINO%\ffmpeg" >nul 2>&1
-mkdir "%DESTINO%\paquetes" >nul 2>&1
-mkdir "%DESTINO%\musica" >nul 2>&1
-mkdir "%DESTINO%\videos" >nul 2>&1
-
-if not exist "%DESTINO%" (
-    echo.
-    echo ERROR:
-    echo No se pudo crear:
-    echo %DESTINO%
-    echo.
-    echo Comprueba que tengas permisos de escritura.
-    echo.
-    pause
-    exit /b 1
-)
-
-:: ============================================================
-:: DESCARGAR PYTHON PORTABLE
-:: ============================================================
-
-echo.
-echo [2/7] Descargando Python portable...
-echo.
-echo Esto puede tardar un poco.
-
-set "PYTHON_ZIP=%TEMP%\karaokefest_python_%RANDOM%.zip"
+echo Descargando Python Portable...
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.14.7/python-3.14.7-embed-amd64.zip' -OutFile '%PYTHON_ZIP%'"
+"$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.14.7/python-3.14.7-embed-amd64.zip' -OutFile '%PYTHON_ZIP%'"
 
-if errorlevel 1 (
+if not exist "%PYTHON_ZIP%" (
     echo.
-    echo ERROR descargando Python.
-    echo.
-    echo Comprueba tu conexion a Internet.
-    echo.
+    echo [ERROR] No se pudo descargar Python Portable.
     pause
     exit /b 1
 )
 
+echo [OK] Python descargado.
 echo.
+
 echo Extrayendo Python...
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"Expand-Archive -LiteralPath '%PYTHON_ZIP%' -DestinationPath '%DESTINO%\python' -Force"
+"Expand-Archive -LiteralPath '%PYTHON_ZIP%' -DestinationPath '%PYTHON_DIR%' -Force"
 
-if errorlevel 1 (
+if not exist "%PYTHON_DIR%\python.exe" (
     echo.
-    echo ERROR extrayendo Python.
-    echo.
+    echo [ERROR] No se encontro python.exe.
     pause
     exit /b 1
 )
 
-del /f /q "%PYTHON_ZIP%" >nul 2>&1
+echo [OK] Python Portable instalado.
+echo.
 
-if not exist "%DESTINO%\python\python.exe" (
+REM ============================================================
+REM CONFIGURAR PYTHON EMBEBIDO
+REM ============================================================
+
+echo Configurando Python Portable...
+
+set "PTH_FILE="
+
+for %%F in ("%PYTHON_DIR%\python*._pth") do (
+    set "PTH_FILE=%%~fF"
+)
+
+if not defined PTH_FILE (
     echo.
-    echo ERROR:
-    echo Python no se extrajo correctamente.
-    echo.
+    echo [ERROR] No se encontro el archivo _pth de Python.
     pause
     exit /b 1
 )
 
-:: ============================================================
-:: CONFIGURAR PYTHON EMBEBIDO
-:: ============================================================
+(
+    echo python314.zip
+    echo .
+    echo %PAQUETES_DIR%
+    echo import site
+) > "%PTH_FILE%"
+
+echo [OK] Python configurado.
+echo.
+
+REM ============================================================
+REM INSTALAR PIP
+REM ============================================================
 
 echo.
-echo Configurando Python portable...
-
-set "PTH="
-
-for %%F in ("%DESTINO%\python\*_pth") do (
-    if exist "%%~fF" (
-        set "PTH=%%~fF"
-    )
-)
-
-if not defined PTH (
-    echo.
-    echo ERROR:
-    echo No se encontro el archivo _pth de Python.
-    echo.
-    pause
-    exit /b 1
-)
-
-mkdir "%DESTINO%\python\Lib\site-packages" >nul 2>&1
-
-findstr /x /c:"Lib\site-packages" "%PTH%" >nul 2>&1
-
-if errorlevel 1 (
-    >>"%PTH%" echo Lib\site-packages
-)
-
-findstr /x /c:"import site" "%PTH%" >nul 2>&1
-
-if errorlevel 1 (
-    >>"%PTH%" echo import site
-)
-
-:: ============================================================
-:: DESCARGAR GET-PIP
-:: ============================================================
-
+echo ============================================================
+echo INSTALANDO PIP
+echo ============================================================
 echo.
-echo [3/7] Preparando pip...
+
+set "GETPIP=%TEMP_DIR%\get-pip.py"
+
+echo Descargando get-pip.py...
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%DESTINO%\python\get-pip.py'"
+"$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%GETPIP%'"
 
-if errorlevel 1 (
+if not exist "%GETPIP%" (
     echo.
-    echo ERROR descargando get-pip.py.
-    echo.
+    echo [ERROR] No se pudo descargar get-pip.py.
     pause
     exit /b 1
 )
 
-"%DESTINO%\python\python.exe" "%DESTINO%\python\get-pip.py" --no-warn-script-location
+echo Instalando pip...
+
+"%PYTHON_DIR%\python.exe" "%GETPIP%" --no-warn-script-location
 
 if errorlevel 1 (
     echo.
-    echo ERROR instalando pip.
-    echo.
-    echo El equipo puede estar bloqueando la instalacion.
-    echo.
+    echo [ERROR] No se pudo instalar pip.
     pause
     exit /b 1
 )
 
-del /f /q "%DESTINO%\python\get-pip.py" >nul 2>&1
-
-:: ============================================================
-:: INSTALAR PAQUETES
-:: ============================================================
-
-echo.
-echo [4/7] Instalando paquetes Python...
-echo.
-echo Flask
-echo flask-cors
-echo yt-dlp
+echo [OK] pip instalado.
 echo.
 
-"%DESTINO%\python\python.exe" -m pip install ^
-Flask ^
-flask-cors ^
-yt-dlp ^
---target "%DESTINO%\paquetes" ^
---no-warn-script-location
+REM ============================================================
+REM PAQUETES PYTHON
+REM ============================================================
+
+echo.
+echo ============================================================
+echo INSTALANDO PAQUETES
+echo ============================================================
+echo.
+
+echo Instalando Flask...
+"%PYTHON_DIR%\python.exe" -m pip install Flask --target "%PAQUETES_DIR%" --upgrade
 
 if errorlevel 1 (
     echo.
-    echo ERROR instalando los paquetes Python.
-    echo.
+    echo [ERROR] Fallo instalando Flask.
     pause
     exit /b 1
 )
 
-:: ============================================================
-:: DESCARGAR FFMPEG
-:: ============================================================
+echo.
+echo Instalando Flask-CORS...
+"%PYTHON_DIR%\python.exe" -m pip install flask-cors --target "%PAQUETES_DIR%" --upgrade
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Fallo instalando flask-cors.
+    pause
+    exit /b 1
+)
 
 echo.
-echo [5/7] Descargando FFmpeg portable...
-echo.
-echo Esto puede tardar un poco.
+echo Instalando yt-dlp...
+"%PYTHON_DIR%\python.exe" -m pip install yt-dlp --target "%PAQUETES_DIR%" --upgrade
 
-set "FFMPEG_ZIP=%TEMP%\karaokefest_ffmpeg_%RANDOM%.zip"
-set "FFMPEG_TEMP=%TEMP%\karaokefest_ffmpeg_extract_%RANDOM%"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Fallo instalando yt-dlp.
+    pause
+    exit /b 1
+)
+
+echo.
+echo [OK] Paquetes instalados.
+echo.
+
+REM ============================================================
+REM FFMPEG
+REM ============================================================
+
+echo.
+echo ============================================================
+echo INSTALANDO FFMPEG
+echo ============================================================
+echo.
+
+set "FFMPEG_ZIP=%TEMP_DIR%\ffmpeg.zip"
+set "FFMPEG_EXTRACT=%TEMP_DIR%\ffmpeg_extract"
+
+echo Descargando FFmpeg...
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile '%FFMPEG_ZIP%'"
+"$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile '%FFMPEG_ZIP%'"
 
-if errorlevel 1 (
+if not exist "%FFMPEG_ZIP%" (
     echo.
-    echo ERROR descargando FFmpeg.
-    echo.
+    echo [ERROR] No se pudo descargar FFmpeg.
     pause
     exit /b 1
 )
 
-mkdir "%FFMPEG_TEMP%" >nul 2>&1
-
-echo.
 echo Extrayendo FFmpeg...
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-"Expand-Archive -LiteralPath '%FFMPEG_ZIP%' -DestinationPath '%FFMPEG_TEMP%' -Force"
+"Expand-Archive -LiteralPath '%FFMPEG_ZIP%' -DestinationPath '%FFMPEG_EXTRACT%' -Force"
 
-if errorlevel 1 (
+if not exist "%FFMPEG_EXTRACT%" (
     echo.
-    echo ERROR extrayendo FFmpeg.
-    echo.
+    echo [ERROR] No se pudo extraer FFmpeg.
     pause
     exit /b 1
 )
 
-:: ============================================================
-:: BUSCAR FFMPEG.EXE
-:: ============================================================
-
-set "FFMPEG_BIN="
-
-for /r "%FFMPEG_TEMP%" %%F in (ffmpeg.exe) do (
-    if not defined FFMPEG_BIN (
-        set "FFMPEG_BIN=%%~dpF"
-    )
-)
-
-if not defined FFMPEG_BIN (
-    echo.
-    echo ERROR:
-    echo No se encontro ffmpeg.exe.
-    echo.
-    pause
-    exit /b 1
-)
-
-echo.
 echo Copiando FFmpeg...
 
-copy /y "%FFMPEG_BIN%ffmpeg.exe" "%DESTINO%\ffmpeg\ffmpeg.exe" >nul
-
-if exist "%FFMPEG_BIN%ffprobe.exe" (
-    copy /y "%FFMPEG_BIN%ffprobe.exe" "%DESTINO%\ffmpeg\ffprobe.exe" >nul
+for /r "%FFMPEG_EXTRACT%" %%F in (ffmpeg.exe) do (
+    if not exist "%FFMPEG_DIR%\ffmpeg.exe" copy /y "%%F" "%FFMPEG_DIR%\ffmpeg.exe" >nul
 )
 
-if exist "%FFMPEG_BIN%ffplay.exe" (
-    copy /y "%FFMPEG_BIN%ffplay.exe" "%DESTINO%\ffmpeg\ffplay.exe" >nul
+for /r "%FFMPEG_EXTRACT%" %%F in (ffprobe.exe) do (
+    if not exist "%FFMPEG_DIR%\ffprobe.exe" copy /y "%%F" "%FFMPEG_DIR%\ffprobe.exe" >nul
 )
 
-rmdir /s /q "%FFMPEG_TEMP%" >nul 2>&1
-del /f /q "%FFMPEG_ZIP%" >nul 2>&1
+for /r "%FFMPEG_EXTRACT%" %%F in (ffplay.exe) do (
+    if not exist "%FFMPEG_DIR%\ffplay.exe" copy /y "%%F" "%FFMPEG_DIR%\ffplay.exe" >nul
+)
 
-if not exist "%DESTINO%\ffmpeg\ffmpeg.exe" (
+if not exist "%FFMPEG_DIR%\ffmpeg.exe" (
     echo.
-    echo ERROR:
-    echo FFmpeg no se copio correctamente.
-    echo.
+    echo [ERROR] No se encontro ffmpeg.exe.
     pause
     exit /b 1
 )
 
-:: ============================================================
-:: COPIAR SERVIDOR.PY
-:: ============================================================
-
-echo.
-echo [6/7] Copiando servidor.py...
-
-copy /y "%~dp0servidor.py" "%DESTINO%\servidor.py" >nul
-
-if errorlevel 1 (
+if not exist "%FFMPEG_DIR%\ffprobe.exe" (
     echo.
-    echo ERROR copiando servidor.py.
-    echo.
+    echo [ERROR] No se encontro ffprobe.exe.
     pause
     exit /b 1
 )
 
-:: ============================================================
-:: CREAR INICIAR_SERVIDOR.BAT
-:: ============================================================
+echo [OK] FFmpeg instalado.
+echo [OK] FFprobe instalado.
+echo.
 
-echo.
-echo [7/7] Creando iniciador...
+REM ============================================================
+REM LIMPIAR TEMPORAL
+REM ============================================================
 
-(
-echo @echo off
-echo setlocal
-echo title KaraokeFest Utility - Servidor
-echo.
-echo cd /d "%%~dp0"
-echo.
-echo set "PYTHONPATH=%%~dp0paquetes"
-echo set "PATH=%%~dp0ffmpeg;%%~dp0python;%%PATH%%"
-echo.
-echo echo ============================================================
-echo echo              KARAOKEFEST UTILITY
-echo echo ============================================================
-echo echo.
-echo echo Servidor iniciandose...
-echo echo.
-echo echo Local:
-echo echo http://127.0.0.1:8765
-echo echo.
-echo echo LAN:
-echo echo http://IP-DE-ESTE-PC:8765
-echo echo.
-echo echo ============================================================
-echo echo.
-echo.
-echo "%%~dp0python\python.exe" "%%~dp0servidor.py"
-echo.
-echo echo.
-echo echo El servidor se ha detenido.
-echo pause
-) > "%DESTINO%\iniciar_servidor.bat"
+if exist "%TEMP_DIR%" rmdir /s /q "%TEMP_DIR%" >nul 2>&1
 
-:: ============================================================
-:: CREAR DESINSTALADOR LOCAL
-:: ============================================================
-
-(
-echo @echo off
-echo title KaraokeFest Utility - Desinstalador
-echo.
-echo echo Se va a eliminar:
-echo echo %%~dp0
-echo echo.
-echo choice /C SN /N /M "Eliminar esta instalacion? [S/N]: "
-echo if errorlevel 2 exit /b 0
-echo.
-echo cd /d "%%~dp0.."
-echo rmdir /s /q "%%~dp0"
-echo.
-echo echo Instalacion eliminada.
-echo pause
-) > "%DESTINO%\desinstalar_local.bat"
-
-:: ============================================================
-:: FINAL
-:: ============================================================
+REM ============================================================
+REM COMPROBACION FINAL
+REM ============================================================
 
 echo.
 echo ============================================================
-echo             INSTALACION COMPLETADA
+echo COMPROBACION FINAL
 echo ============================================================
 echo.
-echo Instalado en:
-echo.
-echo %DESTINO%
-echo.
-echo.
-echo Para iniciar el servidor:
-echo.
-echo %DESTINO%\iniciar_servidor.bat
+
+if exist "%PYTHON_DIR%\python.exe" (
+    echo [OK] Python Portable
+) else (
+    echo [ERROR] Python Portable
+)
+
+if exist "%PAQUETES_DIR%\flask" (
+    echo [OK] Flask
+) else (
+    echo [ERROR] Flask
+)
+
+if exist "%PAQUETES_DIR%\flask_cors" (
+    echo [OK] Flask-CORS
+) else (
+    echo [ERROR] Flask-CORS
+)
+
+if exist "%PAQUETES_DIR%\yt_dlp" (
+    echo [OK] yt-dlp
+) else (
+    echo [ERROR] yt-dlp
+)
+
+if exist "%FFMPEG_DIR%\ffmpeg.exe" (
+    echo [OK] FFmpeg
+) else (
+    echo [ERROR] FFmpeg
+)
+
+if exist "%FFMPEG_DIR%\ffprobe.exe" (
+    echo [OK] FFprobe
+) else (
+    echo [ERROR] FFprobe
+)
+
 echo.
 echo ============================================================
+echo INSTALACION TERMINADA
+echo ============================================================
 echo.
+echo Todo se ha instalado dentro de:
+echo.
+echo %BASE%
+echo.
+echo Ahora puedes hacer doble clic en:
+echo.
+echo   servidor.py
+echo.
+echo para iniciar el servidor.
+echo.
+
 pause
-
 exit /b 0
